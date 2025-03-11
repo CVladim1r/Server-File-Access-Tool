@@ -1,24 +1,40 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form, Body
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+
+from slugify import slugify
+from werkzeug.utils import secure_filename
+import traceback
 
 from pathlib import Path
 import os
 import uuid
+from urllib.parse import unquote
 import importlib.util
 from PIL import Image
 from io import BytesIO
 import mimetypes
 import textwrap
 import shutil
+from pydantic import BaseModel
+from typing import List
+import json
 
 UPLOAD_DIR = "uploads"
 PREVIEW_DIR = "previews"
 
+class CodeBlock(BaseModel):
+    id: str = str(uuid.uuid4())
+    title: str
+    content: str
+    collapsed: bool = False 
+
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(PREVIEW_DIR, exist_ok=True)
+
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -188,50 +204,75 @@ async def rename_item(old_path: str = Form(...), new_name: str = Form(...)):
 @app.post("/move-item/")
 async def move_item(old_path: str = Form(...), new_path: str = Form(...)):
     try:
-        old_full = Path(UPLOAD_DIR) / old_path
-        new_full = Path(UPLOAD_DIR) / new_path
-        
-        if new_full.exists():
-            raise HTTPException(status_code=400, detail="Target path already exists")
-        
+        old_full = Path(UPLOAD_DIR) / unquote(old_path)
+        new_full = Path(UPLOAD_DIR) / unquote(new_path)
+
+        if not old_full.exists():
+            raise HTTPException(status_code=404, detail="Source not found")
+
+        if new_full.parent != old_full.parent and not new_full.parent.exists():
+            new_full.parent.mkdir(parents=True, exist_ok=True)
+
         shutil.move(str(old_full), str(new_full))
-        
-        old_preview = Path(PREVIEW_DIR) / old_path
+
+        old_preview = Path(PREVIEW_DIR) / unquote(old_path)
         if old_preview.exists():
-            new_preview = Path(PREVIEW_DIR) / new_path
+            new_preview = Path(PREVIEW_DIR) / unquote(new_path)
             shutil.move(str(old_preview), str(new_preview))
-        
+
         return {"status": "success"}
+
     except Exception as e:
+        print(f"Move error: {traceback.format_exc()}")
         return JSONResponse(
             status_code=500,
-            content={"message": f"Error moving item: {str(e)}"}
+            content={"message": f"Move failed: {str(e)}"}
         )
-
+    
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...), path: str = Form("")):
     try:
-        file_name = f"{str(uuid.uuid4())}_{file.filename}"
-        file_path = Path(UPLOAD_DIR) / path / file_name
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        if '..' in path or path.startswith('/'):
+            raise HTTPException(status_code=400, detail="Invalid path format")
+        
+        adjusted_path = Path(path.strip('/'))
+        if adjusted_path.suffix:
+            target_dir = adjusted_path.parent
+        else:
+            target_dir = adjusted_path
+
+        safe_path = Path(UPLOAD_DIR) / target_dir
+        safe_path.mkdir(parents=True, exist_ok=True)
+
+        original_filename = secure_filename(file.filename)
+        file_name = f"{uuid.uuid4()}_{original_filename}"
+        file_path = safe_path / file_name
         
         with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
+            while content := await file.read(1024 * 1024):
+                f.write(content)
         
-        preview_path = await generate_preview(str(file_path), file.filename)
+        try:
+            preview_path = await generate_preview(str(file_path), original_filename)
+        except Exception as preview_error:
+            print(f"Preview error: {preview_error}")
+            preview_path = None
         
         return {
-            "filename": file_name,
-            "preview": f"/preview/{Path(path) / file_name}" if preview_path else None,
-            "type": mimetypes.guess_type(file.filename)[0] or 'unknown'
+            "filename": str(file_path.relative_to(UPLOAD_DIR)),
+            "preview": f"/preview/{file_path.relative_to(UPLOAD_DIR)}" if preview_path else None,
+            "type": mimetypes.guess_type(original_filename)[0] or 'unknown'
         }
+        
+    except HTTPException as he:
+        raise
     except Exception as e:
+        print(f"Upload error: {traceback.format_exc()}")
         return JSONResponse(
             status_code=500,
-            content={"message": f"Error uploading file: {str(e)}"}
+            content={"message": "File upload failed"}
         )
-
+    
 @app.get("/files/")
 async def list_files():
     try:
@@ -272,3 +313,112 @@ async def get_preview(path: str):
         return FileResponse(preview_path)
     
     return Response(status_code=204)
+
+@app.get("/code-blocks/", response_model=List[CodeBlock])
+async def get_code_blocks():
+    try:
+        with open("code_blocks.json", "r") as f:
+            return json.load(f)
+    except:
+        return []
+
+@app.post("/save-code-block/")
+async def save_code_block(block_data: dict):
+    try:
+        block = CodeBlock(**block_data)
+        
+        blocks = []
+        if Path("code_blocks.json").exists():
+            with open("code_blocks.json", "r") as f:
+                blocks = json.load(f)
+        
+        existing_index = next((i for i, b in enumerate(blocks) if b['id'] == block.id), -1)
+        
+        if existing_index != -1:
+            blocks[existing_index] = block.dict()
+        else:
+            blocks.append(block.dict())
+        
+        with open("code_blocks.json", "w") as f:
+            json.dump(blocks, f, indent=2)
+            
+        return {"status": "success", "id": block.id}
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Validation error: {str(e)}"}
+        )
+
+@app.delete("/delete-code-block/{block_id}")
+async def delete_code_block(block_id: str):
+    try:
+        blocks = []
+        if Path("code_blocks.json").exists():
+            with open("code_blocks.json", "r") as f:
+                blocks = json.load(f)
+        
+        blocks = [b for b in blocks if b['id'] != block_id]
+        
+        with open("code_blocks.json", "w") as f:
+            json.dump(blocks, f)
+            
+        return {"status": "success"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
+    
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=400,
+        content={"message": f"Validation error: {str(exc)}"}
+    )
+
+
+@app.get("/get-code-block/{block_id}")
+async def get_code_block(block_id: str):
+    try:
+        with open("code_blocks.json", "r") as f:
+            blocks = json.load(f)
+        block = next(b for b in blocks if b['id'] == block_id)
+        return block
+    except:
+        return JSONResponse(status_code=404, content={"message": "Block not found"})
+
+@app.put("/update-code-block/{block_id}")
+async def update_code_block(block_id: str, block_data: dict):
+    try:
+        with open("code_blocks.json", "r") as f:
+            blocks = json.load(f)
+            
+        index = next(i for i, b in enumerate(blocks) if b['id'] == block_id)
+        blocks[index] = {**blocks[index], **block_data}
+        
+        with open("code_blocks.json", "w") as f:
+            json.dump(blocks, f)
+            
+        return {"status": "success"}
+    except:
+        return JSONResponse(status_code=404, content={"message": "Block not found"})
+
+@app.patch("/update-block/{block_id}/")
+async def update_block_state(
+    block_id: str, 
+    payload: dict = Body(...)
+):
+    try:
+        with open("code_blocks.json", "r") as f:
+            blocks = json.load(f)
+            
+        index = next(i for i, b in enumerate(blocks) if b['id'] == block_id)
+        blocks[index]['collapsed'] = payload.get('collapsed', False)
+        
+        with open("code_blocks.json", "w") as f:
+            json.dump(blocks, f)
+            
+        return {"status": "success"}
+    except Exception as e:
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"Error: {str(e)}"}
+        )

@@ -1,158 +1,80 @@
 let currentPath = '';
 let selectedNode = null;
+let editor;
+let editorInitialized = false;
+let editingBlockId = null;
 
-// $(document).ready(function() {
-//     $('#fileTree').jstree({
-//         'core': {
-//             'data': function(node, cb) {
-//                 const path = node.id === '#' ? '' : node.id;
-//                 fetch(`/get-content/${path}`)
-//                     .then(response => response.json())
-//                     .then(data => {
-//                         const items = data.content.map(item => ({
-//                             id: item.path,
-//                             text: item.name,
-//                             type: item.type,
-//                             children: item.type === 'folder',
-//                             icon: item.type === 'folder' ? 'jstree-folder' : 
-//                                 (item.preview ? item.preview : 'jstree-file')
-//                         }));
-//                         cb(items);
-//                     });
-//             }
-//         },
-//         'plugins': ['contextmenu', 'types'],
-//         'types': {
-//             'folder': { 'icon': 'jstree-folder' },
-//             'file': { 'icon': 'jstree-file' }
-//         },
-//         'contextmenu': {
-//             'items': function(node) {
-//                 return {
-//                     createFolder: {
-//                         label: "New Folder",
-//                         action: function() {
-//                             const name = prompt("Enter folder name");
-//                             if (name) {
-//                                 const newPath = node.id ? `${node.id}/${name}` : name;
-//                                 fetch('/create-folder/', {
-//                                     method: 'POST',
-//                                     headers: {
-//                                         'Content-Type': 'application/x-www-form-urlencoded',
-//                                     },
-//                                     body: `path=${encodeURIComponent(newPath)}`
-//                                 }).then(() => {
-//                                     $('#fileTree').jstree(true).refresh_node(node);
-//                                 });
-//                             }
-//                         }
-//                     },
-//                     renameItem: {
-//                         label: "Rename",
-//                         action: function() {
-//                             const newName = prompt("Enter new name", node.text);
-//                             if (newName) {
-//                                 fetch('/rename-item/', {
-//                                     method: 'POST',
-//                                     headers: {
-//                                         'Content-Type': 'application/x-www-form-urlencoded',
-//                                     },
-//                                     body: `old_path=${encodeURIComponent(node.id)}&new_name=${encodeURIComponent(newName)}`
-//                                 }).then(() => {
-//                                     $('#fileTree').jstree(true).refresh_node(node.parent);
-//                                 });
-//                             }
-//                         }
-//                     },
-//                     deleteItem: {
-//                         label: "Delete",
-//                         action: function() {
-//                             if (confirm(`Delete ${node.text}?`)) {
-//                                 fetch('/delete-item/', {
-//                                     method: 'POST',
-//                                     headers: {
-//                                         'Content-Type': 'application/x-www-form-urlencoded',
-//                                     },
-//                                     body: `path=${encodeURIComponent(node.id)}`
-//                                 }).then(() => {
-//                                     $('#fileTree').jstree(true).delete_node(node);
-//                                 });
-//                             }
-//                         }
-//                     },
-//                     moveItem: {
-//                         label: "Move",
-//                         action: function() {
-//                             const newPath = prompt("Enter new path", Path.dirname(node.id));
-//                             if (newPath !== null) {
-//                                 const newFullPath = `${newPath}/${node.text}`;
-//                                 fetch('/move-item/', {
-//                                     method: 'POST',
-//                                     headers: {
-//                                         'Content-Type': 'application/x-www-form-urlencoded',
-//                                     },
-//                                     body: `old_path=${encodeURIComponent(node.id)}&new_path=${encodeURIComponent(newFullPath)}`
-//                                 }).then(() => {
-//                                     $('#fileTree').jstree(true).refresh();
-//                                 });
-//                             }
-//                         }
-//                     }
-//                 };
-//             }
-//         }
-//     });
-
-//     $('#fileTree').on('select_node.jstree', function(e, data) {
-//         currentPath = data.node.id;
-//         document.getElementById('currentPath').textContent = currentPath || '/';
-//     });
-// });
-
-// async function refreshLists() {
-//     const files = await fetch('/files/').then(r => r.json());
-//     const fileList = document.getElementById('fileList');
-//     fileList.innerHTML = files.files.map(file => `
-//         <div class="list-group-item file-item">
-//             <div class="preview-container">
-//                 ${getPreviewHTML(file)}
-//             </div>
-//             <div class="file-info">
-//                 <div class="file-name">${file.filename}</div>
-//                 <div class="file-actions">
-//                     <button class="btn btn-sm btn-primary" 
-//                             onclick="downloadFile('${file.filename}')">
-//                         Download
-//                     </button>
-//                 </div>
-//             </div>
-//         </div>
-//     `).join('');
-
-//     const fileSelect = document.getElementById('fileSelect');
-
-//     fileSelect.innerHTML = files.files.map(file => 
-//         `<option value="${file}">${file}</option>`
-//     ).join('');
-
-//     const handlers = await fetch('/handlers/').then(r => r.json());
-//     const handlerList = document.getElementById('handlerList');
-//     const handlerSelect = document.getElementById('handlerSelect');
+document.addEventListener('DOMContentLoaded', () => {
+    initMonacoEditor();
+    initTree();
+    loadCodeBlocks();
+    hljs.configure({ languages: ['1c'] });
+    hljs.highlightAll();
     
-//     handlerList.innerHTML = handlers.handlers.map(handler => `
-//         <div class="list-group-item">${handler}</div>
-//     `).join('');
+    const checkEditor = setInterval(() => {
+        if (editorInitialized) {
+            console.log('Editor ready');
+            clearInterval(checkEditor);
+        }
+    }, 500);
+});
 
-//     handlerSelect.innerHTML = handlers.handlers.map(handler => 
-//         `<option value="${handler}">${handler}</option>`
-//     ).join('');
-// }
+document.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+});
+
+document.addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+});
+
+function initMonacoEditor() {
+    if (!editorInitialized) {
+        require.config({
+            paths: { 
+                vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' 
+            },
+            waitSeconds: 30
+        });
+        
+        require(['vs/editor/editor.main'], function() {
+            const container = document.getElementById('codeBlockContent');
+            if (!container) {
+                console.error('Editor container not found!');
+                return;
+            }
+
+            container.style.height = '500px';
+            editor = monaco.editor.create(container, {
+                value: "",
+                language: '1c',
+                theme: 'vs-dark',
+                minimap: { enabled: true },
+                automaticLayout: true
+            });
+
+            editor.onDidChangeModelContent(() => {
+                window.monacoContent = editor.getValue();
+                console.log('Content changed:', window.monacoContent);
+            });
+
+            editorInitialized = true;
+        });
+    }
+}
 
 $(document).ready(function() {
     initTree();
     $('#fileTree').on('select_node.jstree', function(e, data) {
-        selectedNode = data.node;
-        currentPath = data.node.id;
+        if (data.node.type === 'file') {
+            const pathParts = data.node.id.split('/');
+            pathParts.pop();
+            currentPath = pathParts.join('/') || '/';
+        } else {
+            currentPath = data.node.id || '/';
+        }
+
         document.getElementById('currentPath').textContent = currentPath || '/';
     });
 });
@@ -161,15 +83,42 @@ function initTree() {
     $('#fileTree').jstree({
         'core': {
             'data': loadTreeData,
-            'check_callback': true
+            'check_callback': function(op, node, parent, position, more) {
+                if (op === 'move_node') {
+                    const parentNode = this.get_node(parent);
+                    return parentNode && parentNode.type === 'folder';
+                }
+                return true;
+            },
+            'themes': {
+                'icons': false,
+                'dots': true, // Включаем точки для иерархии
+                'stripes': false
+            }
         },
-        'plugins': ['dnd', 'contextmenu'],
+        'plugins': ['dnd', 'contextmenu', 'wholerow'],
+        'dnd': {
+            'is_draggable': function(nodes) {
+                return nodes.every(node => node.type !== 'root');
+            },
+            'inside_pos': 'last',
+            'touch': true,
+            'large_drop_target': true,
+            'large_drag_target': false,
+            'is_target': function(node) {
+                return node.type === 'folder';
+            },
+            'copy': false // Запрещаем копирование
+        },
         'contextmenu': {
             'items': generateContextMenu
         }
-    }).on('ready.jstree', function() {
-        const rootNode = $('#fileTree').jstree(true).get_node('#');
-        $('#fileTree').jstree(true).select_node(rootNode.children[0]);
+    });
+
+    $('#fileTree')
+    .on('move_node.jstree', handleMoveNode)
+    .on('dnd_stop.vakata', function(e, data) {
+        $('.jstree-dnd-helper').remove();
     });
 }
 
@@ -177,20 +126,33 @@ async function loadTreeData(node, cb) {
     try {
         const path = node.id === '#' ? '' : node.id;
         const response = await fetch(`/get-content/${encodeURIComponent(path)}`);
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message);
-        }
-        
         const data = await response.json();
         
         const items = data.content.map(item => ({
             id: item.path,
-            text: item.name,
+            text: `
+                <div class="node-content">
+                    <i class="${item.type === 'folder' ? 'fas fa-folder' : 'fas fa-file'}"></i>
+                    <div class="flex-btn-namefile">
+                        <span class="node-name">${item.name}</span>
+                        ${item.type === 'file' ? 
+                            `<button class="download-btn" 
+                                    onclick="event.stopPropagation(); downloadFile('${encodeURIComponent(item.path)}')">
+                                <i class="fas fa-download"></i>
+                            </button>` : ''
+                        }
+                    </div>
+                </div>
+            `,
             type: item.type,
             children: item.type === 'folder',
-            icon: item.preview ? item.preview : (item.type === 'folder' ? 'jstree-folder' : 'jstree-file')
+            data: {
+                name: item.name
+            },
+            li_attr: {
+                class: "custom-node",
+                style: "position: relative;"
+            }
         }));
         
         cb(items);
@@ -201,7 +163,7 @@ async function loadTreeData(node, cb) {
 }
 
 function generateContextMenu(node) {
-    return {
+    const items = {
         create: {
             label: "New Folder",
             action: () => createFolderPrompt(node)
@@ -219,6 +181,15 @@ function generateContextMenu(node) {
             action: () => moveItemPrompt(node)
         }
     };
+
+    if (node.type === 'file') {
+        items.download = {
+            label: "Download",
+            action: () => downloadFile(node.id)
+        };
+    }
+
+    return items;
 }
 
 async function createFolder() {
@@ -259,8 +230,6 @@ async function moveItem() {
     if (!selectedNode) return alert('Please select an item first');
     await moveItemPrompt(selectedNode);
 }
-
-
 async function createFolderPrompt(node) {
     const name = prompt("Enter folder name");
     if (name) {
@@ -291,8 +260,6 @@ async function createFolderPrompt(node) {
         }
     }
 }
-
-
 async function renameItemPrompt(node) {
     const newName = prompt("Enter new name", node.text);
     if (newName) {
@@ -366,13 +333,59 @@ function refreshTree() {
     $('#fileTree').jstree(true).refresh(true);
 }
 
+function handleMoveNode(e, data) {
+    const oldPath = data.node.id;
+    const newParent = data.parent === '#' ? '' : data.parent;
+    const newParentNode = $('#fileTree').jstree(true).get_node(newParent);
+
+    if (!newParentNode || newParentNode.type !== 'folder') {
+        $('#fileTree').jstree(true).refresh();
+        return false;
+    }
+
+    const originalName = data.node.original.data.name || data.node.text;
+    const newPath = newParent ? `${newParent}/${originalName}` : originalName;
+
+    const originalState = {
+        parent: data.old_parent,
+        position: data.old_position
+    };
+
+    fetch('/move-item/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `old_path=${encodeURIComponent(oldPath)}&new_path=${encodeURIComponent(newPath)}`
+    }).then(response => {
+        if (!response.ok) {
+            $('#fileTree').jstree(true).move_node(
+                data.node,
+                originalState.parent,
+                originalState.position
+            );
+            throw new Error('Move operation failed');
+        }
+        $('#fileTree').jstree(true).refresh_node(newParent);
+    }).catch(error => {
+        showAlert(`Error: ${error.message}`, 'danger', 3000);
+    });
+}
+
+
 async function uploadFile() {
     const input = document.getElementById('fileInput');
     if (!input.files.length) return;
 
+    let uploadPath = currentPath;
+    
+    if (selectedNode && selectedNode.type === 'file') {
+        const pathParts = currentPath.split('/');
+        pathParts.pop();
+        uploadPath = pathParts.join('/');
+    }
+
     const formData = new FormData();
     formData.append('file', input.files[0]);
-    formData.append('path', currentPath);
+    formData.append('path', uploadPath);
 
     try {
         const response = await fetch('/upload/', {
@@ -417,11 +430,14 @@ function getPreviewHTML(file) {
     return `<div class="file-icon">${(file.type.split('/').pop() || 'FILE').toUpperCase()}</div>`;
 }
 
-function downloadFile(filename) {
-    window.open(`/download/${filename}`, '_blank');
+function downloadFile(path) {
+    const decodedPath = decodeURIComponent(path);
+    const encodedPath = encodeURIComponent(decodedPath);
+
+    window.open(`/download/${encodedPath}`, '_blank');
 }
 
-function showAlert(message, type = 'info') {
+function showAlert(message, type = 'info', timeout = 3000) {
     const alert = document.createElement('div');
     alert.className = `alert alert-${type} alert-dismissible fade show fixed-top m-3`;
     alert.innerHTML = `
@@ -429,7 +445,169 @@ function showAlert(message, type = 'info') {
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
     document.body.prepend(alert);
-    setTimeout(() => alert.remove(), 3000);
+    setTimeout(() => alert.remove(), timeout);
+}
+
+async function loadCodeBlocks() {
+    try {
+        const response = await fetch('/code-blocks/');
+        const blocks = await response.json();
+        renderCodeBlocks(blocks);
+    } catch (error) {
+        console.error('Ошибка загрузки блоков:', error);
+        showAlert('Не удалось загрузить блоки кода', 'danger');
+    }
+}
+
+async function saveCodeBlock() {
+    try {
+        const title = document.getElementById('codeBlockTitle').value;
+        const content = editor.getValue();
+        
+        const url = editingBlockId 
+            ? `/update-code-block/${editingBlockId}/`
+            : '/save-code-block/';
+
+        const method = editingBlockId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                title,
+                content,
+                id: editingBlockId || undefined
+            })
+        });
+
+        if (!response.ok) throw new Error('Save failed');
+        
+        editingBlockId = null;
+        // new bootstrap.Modal(document.getElementById('codeBlockModal')).hide();
+        showAlert('Block saved successfully!', 'success');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('codeBlockModal'));
+        if (modal) {
+            modal.hide();
+        }
+        clearEditor();
+        loadCodeBlocks();
+    } catch (e) {
+        showAlert(`Error: ${e.message}`, 'danger');
+    }
+}
+
+async function deleteCodeBlock(id) {
+    if (confirm('Delete this code block?')) {
+        await fetch(`/delete-code-block/${id}/`, { method: 'DELETE' });
+        loadCodeBlocks();
+    }
+}
+
+function showAddCodeBlockModal() {
+    document.getElementById('codeBlockTitle').value = '';
+    
+    if (editor && editorInitialized) {
+        editor.setValue('');
+        editor.layout();
+        window.monacoContent = '';
+    } else {
+        console.error('Editor not initialized!');
+        showAlert('Editor is not ready. Please wait...', 'warning');
+        return;
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('codeBlockModal'));
+    modal.show();
+    
+    setTimeout(() => {
+        if (editor) {
+            editor.focus();
+            editor.layout();
+        }
+    }, 300);
+}
+
+function renderCodeBlocks(blocks) {
+    const container = document.getElementById('codeBlocksContainer');
+    if (!container) return;
+
+    container.innerHTML = blocks.map(block => `
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <button class="btn btn-sm btn-link" onclick="toggleCodeBlock('${block.id}')">
+                        <i class="fas fa-chevron-${block.collapsed ? 'down' : 'up'}"></i>
+                    </button>
+                    ${block.title}
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-primary" onclick="editCodeBlock('${block.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteCodeBlock('${block.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body" id="content-${block.id}" 
+                 style="${block.collapsed ? 'display: none;' : ''}">
+                <pre><code class="language-1c">${hljs.highlightAuto(block.content).value}</code></pre>
+            </div>
+        </div>
+    `).join('');
+}
+
+function toggleCodeBlock(blockId) {
+    const contentDiv = document.getElementById(`content-${blockId}`);
+    const icon = contentDiv.previousElementSibling.querySelector('.fa-chevron-up, .fa-chevron-down');
+    
+    if (contentDiv.style.display === 'none') {
+        contentDiv.style.display = 'block';
+        icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+    } else {
+        contentDiv.style.display = 'none';
+        icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+    }
+    
+    updateBlockCollapsedState(blockId, contentDiv.style.display === 'none');
+}
+
+async function updateBlockCollapsedState(blockId, collapsed) {
+    try {
+        await fetch(`/update-block/${blockId}/`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({collapsed})
+        });
+    } catch (e) {
+        console.error('Error updating block state:', e);
+    }
+}
+
+async function editCodeBlock(blockId) {
+    try {
+        const response = await fetch(`/get-code-block/${blockId}/`);
+        const block = await response.json();
+        
+        editingBlockId = blockId;
+        document.getElementById('codeBlockTitle').value = block.title;
+        editor.setValue(block.content);
+        
+        new bootstrap.Modal(document.getElementById('codeBlockModal')).show();
+    } catch (e) {
+        showAlert('Error loading block for editing', 'danger');
+    }
+}
+
+function clearEditor() {
+    document.getElementById('codeBlockTitle').value = '';
+    editor.setValue('');
+    editingBlockId = null;
+}
+
+function refreshLists() {
+    refreshTree();
+    loadCodeBlocks();
 }
 
 document.addEventListener('DOMContentLoaded', refreshLists);

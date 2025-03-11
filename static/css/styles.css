@@ -115,7 +115,7 @@ body {
 }
 
 #fileTree {
-    min-height: 500px;
+    min-height: 360px;
     overflow: auto;
 }
 
@@ -124,12 +124,6 @@ body {
     top: 20px;
     right: 20px;
     z-index: 1000;
-}
-
-.jstree-anchor {
-    display: flex !important;
-    align-items: center;
-    gap: 8px;
 }
 
 .btn-group {
@@ -146,9 +140,66 @@ body {
     height: 200px;
 }
 
+.jstree-ocl {
+    position: relative;
+    left: 0;
+    margin-right: 8px !important;
+    float: left;
+}
+
+.jstree-anchor {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0 !important;
+}
+
+.jstree-anchor .node-icon {
+    order: 1;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.jstree-icon {
+    order: 1;
+    display: flex !important;
+    align-items: center;
+}
+
+.jstree-icon.fa {
+    font-size: 16px;
+    width: 18px;
+    height: 18px;
+    margin-right: 5px;
+    color: #ffc107;
+}
+
+.jstree-icon.fa-folder-open {
+    color: #ffc107;
+}
+
+.jstree-icon.fa-file {
+    color: #0d6efd;
+}
+
+.jstree-wholerow {
+    height: 28px;
+}
+
+.node-name {
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .jstree-node {
-    cursor: pointer;
-    transition: background-color 0.2s;
+    display: block !important;
+    margin: 2px 0;
+    white-space: nowrap;
 }
 
 .jstree-node.li {
@@ -163,6 +214,24 @@ body {
     display: flex;
     align-items: center;
     width: 100%;
+    padding: 4px 0;
+    gap: 8px;
+}
+
+.node-content i.fa-folder {
+    color: #ffc107;
+    margin-right: 8px;
+    width: 20px;
+}
+
+.node-content i.fa-file {
+    color: #0d6efd;
+    margin-right: 8px;
+    width: 20px;
+}
+
+.flex-btn-namefile{
+    display: flex;
 }
 
 .node-icon {
@@ -170,52 +239,127 @@ body {
     margin-right: 8px;
 }
 
-.node-name {
-    flex-grow: 1;
-    margin-right: 10px;
+.jstree-default .jstree-node {
+    min-height: 24px;
+    line-height: 24px;
+    min-width: 24px;
 }
 
 .download-btn {
-    padding: 0 5px;
-    color: #6c757d;
+    /* margin-left: auto !important; */
+    order: 3;
+    background-color: #fff;
+    color: black !important;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    opacity: 1;
+    transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 32px;
+}
+
+.jstree-last > .jstree-ocl {
+    background-position: -56px -20px;
+}
+
+.jstree-default .jstree-no-icons .jstree-anchor>.jstree-themeicon {
+    display: none;
     visibility: hidden;
 }
 
 .jstree-node:hover .download-btn {
-    visibility: visible;
+    opacity: 1;
 }
 
-.jstree-folder > a > .node-icon::before {
-    font-family: "Font Awesome 5 Free";
+.jstree-folder > .jstree-anchor > .node-icon::before {
     content: "\f07b";
+    font-family: "Font Awesome 5 Free";
     color: #ffc107;
 }
 
-.jstree-folder.jstree-open > a > .node-icon::before {
+.jstree-folder.jstree-open > .jstree-anchor > .node-icon::before {
     content: "\f07c";
 }
 
-.jstree-file > a > .node-icon::before {
-    font-family: "Font Awesome 5 Free";
+.jstree-file > .jstree-anchor > .node-icon::before {
     content: "\f15b";
+    font-family: "Font Awesome 5 Free";
     color: #0d6efd;
 }
 
-.jstree-anchor {
-    width: 100%;
-    display: flex !important;
-    align-items: center;
-    padding: 5px 0 !important;
+#fileTree .jstree-container-ul {
+    padding-left: 0 !important;
 }
 
-.jstree-wholerow {
-    border-bottom: 1px solid #eee;
+
+#fileTree > .jstree-container-ul > .jstree-node {
+    margin-left: 0 !important;
+}
+
+.vakata-drag {
+    cursor: move !important;
+    opacity: 0.7;
+}
+.vakata-drag.vakata-drag-active {
+    cursor: grabbing !important;
+    cursor: -webkit-grabbing !important;
+}
+
+.jstree-children {
+    padding-left: 24px !important;
 }
 
 .jstree-wholerow-hovered {
     background: #f8f9fa;
 }
 
+.jstree-dnd {
+    background: #fff !important;
+    border: 1px solid #dee2e6 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    padding: 8px 12px !important;
+    line-height: normal !important;
+}
+
+.jstree-dnd .jstree-er,
+.jstree-dnd .jstree-ok,
+.jstree-dnd .jstree-invalid {
+    display: inline-block !important;
+}
+
+/* Убираем стандартное поведение браузера */
+#fileTree * {
+    user-select: none;
+    -webkit-user-drag: none;
+    drag-handle: none;
+}
+
+/* Фикс для превью при перетаскивании */
+.jstree-dnd-helper {
+    opacity: 0.8 !important;
+    background: #fff !important;
+    border: 1px solid #007bff !important;
+    border-radius: 4px !important;
+    padding: 6px 10px !important;
+}
+
+.jstree-ok { background-color: #d4edda !important; }
+.jstree-er { background-color: #f8d7da !important; }
+
+.code-editor {
+    height: 500px;
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.hljs-1c {
+    background: #1e1e1e;
+    color: #dcdcdc;
+}
 
 @keyframes spinner {
     to { transform: rotate(360deg); }
