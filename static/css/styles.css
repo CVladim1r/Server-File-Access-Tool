@@ -1,0 +1,222 @@
+body {
+    background-color: #f8f9fa;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+}
+
+.file-list, .handler-list {
+    max-height: 800px;
+    overflow-y: auto;
+}
+
+.list-group-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.badge {
+    cursor: pointer;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.preview-container {
+    width: 100px;
+    height: 100px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.file-preview {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.code-preview {
+    font-size: 0.8em;
+    margin: 0;
+    padding: 0.5rem;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: white;
+}
+
+.file-icon {
+    font-size: 0.8em;
+    color: #6c757d;
+}
+
+.file-info {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.file-name {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#processingResult {
+    padding: 15px;
+    background-color: #fff;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 0.2em solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spinner 0.75s linear infinite;
+}
+
+#editor {
+    height: calc(100vh - 60px);
+}
+
+.jstree-proton {
+    width: 100%;
+    overflow: auto;
+}
+
+.modal-content {
+    background-color: #2d2d2d;
+    color: white;
+}
+
+.context-menu {
+    position: absolute;
+    background: #333;
+    border: 1px solid #444;
+    padding: 5px 0;
+    z-index: 1000;
+}
+
+#fileTree {
+    min-height: 500px;
+    overflow: auto;
+}
+
+.fixed-top {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.jstree-anchor {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-group {
+    gap: 0.5rem;
+}
+
+.modal-content {
+    background-color: white;
+    color: #333;
+}
+
+#targetFolder {
+    width: 100%;
+    height: 200px;
+}
+
+.jstree-node {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.jstree-node.li {
+    display: flex;
+}
+
+.jstree-node:hover {
+    background-color: #f8f9fa;
+}
+
+.node-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.node-icon {
+    width: 20px;
+    margin-right: 8px;
+}
+
+.node-name {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+.download-btn {
+    padding: 0 5px;
+    color: #6c757d;
+    visibility: hidden;
+}
+
+.jstree-node:hover .download-btn {
+    visibility: visible;
+}
+
+.jstree-folder > a > .node-icon::before {
+    font-family: "Font Awesome 5 Free";
+    content: "\f07b";
+    color: #ffc107;
+}
+
+.jstree-folder.jstree-open > a > .node-icon::before {
+    content: "\f07c";
+}
+
+.jstree-file > a > .node-icon::before {
+    font-family: "Font Awesome 5 Free";
+    content: "\f15b";
+    color: #0d6efd;
+}
+
+.jstree-anchor {
+    width: 100%;
+    display: flex !important;
+    align-items: center;
+    padding: 5px 0 !important;
+}
+
+.jstree-wholerow {
+    border-bottom: 1px solid #eee;
+}
+
+.jstree-wholerow-hovered {
+    background: #f8f9fa;
+}
+
+
+@keyframes spinner {
+    to { transform: rotate(360deg); }
+}
