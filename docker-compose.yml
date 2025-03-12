@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./code_blocks.json:/app/code_blocks.json
+      - ./previews:/app/previews
+      - ./static:/app/static
+      - ./templates:/app/templates
+    environment:
+      - APP_ENV=production
+    restart: unless-stopped

@@ -1,3 +1,11 @@
+import os
+import uuid
+import json
+import shutil
+import textwrap
+import mimetypes
+import traceback
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form, Body
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -5,23 +13,13 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 
-from slugify import slugify
 from werkzeug.utils import secure_filename
-import traceback
-
-from pathlib import Path
-import os
-import uuid
 from urllib.parse import unquote
-import importlib.util
+from pathlib import Path
 from PIL import Image
-from io import BytesIO
-import mimetypes
-import textwrap
-import shutil
 from pydantic import BaseModel
 from typing import List
-import json
+
 
 UPLOAD_DIR = "uploads"
 PREVIEW_DIR = "previews"
@@ -36,7 +34,13 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(PREVIEW_DIR, exist_ok=True)
 
 
-app = FastAPI()
+app = FastAPI(
+    debug = False,
+    title = "FastAPIServerApp",
+    description = "1C или путь успеха",
+    version = "0.0.2",
+)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -80,7 +84,6 @@ async def generate_preview(file_path: str, filename: str):
 @app.get("/", response_class=HTMLResponse)
 async def main_page(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
-
 
 @app.post("/create-folder/")
 async def create_folder(path: str = Form(...)):
@@ -245,7 +248,7 @@ async def upload_file(file: UploadFile = File(...), path: str = Form("")):
         safe_path.mkdir(parents=True, exist_ok=True)
 
         original_filename = secure_filename(file.filename)
-        file_name = f"{uuid.uuid4()}_{original_filename}"
+        file_name = f"{original_filename}"
         file_path = safe_path / file_name
         
         with open(file_path, "wb") as f:
@@ -294,12 +297,18 @@ async def list_files():
             content={"message": f"Error listing files: {str(e)}"}
         )
 
-@app.get("/download/{filename}")
-async def download_file(filename: str):
-    file_path = os.path.join(UPLOAD_DIR, filename)
-    if os.path.exists(file_path):
-        return FileResponse(file_path)
-    raise HTTPException(status_code=404, detail="File not found")
+@app.get("/download/{filepath:path}")
+async def download_file(filepath: str):
+    decoded_path = unquote(filepath)
+    target_file = Path(UPLOAD_DIR) / decoded_path
+    if ".." in decoded_path:
+        raise HTTPException(400, "Invalid path")
+    print(f"Requested file: {target_file}")
+    if not target_file.exists():
+        raise HTTPException(404, "File not found")
+    if not target_file.is_file():
+        raise HTTPException(400, "Not a file")
+    return FileResponse(target_file)
 
 @app.get("/preview/{path:path}")
 async def get_preview(path: str):
