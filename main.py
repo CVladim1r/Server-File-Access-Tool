@@ -17,7 +17,7 @@ from werkzeug.utils import secure_filename
 from urllib.parse import unquote
 from pathlib import Path
 from PIL import Image
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 
 
@@ -25,7 +25,7 @@ UPLOAD_DIR = "uploads"
 PREVIEW_DIR = "previews"
 
 class CodeBlock(BaseModel):
-    id: str = str(uuid.uuid4())
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str
     content: str
     collapsed: bool = False 
@@ -334,6 +334,9 @@ async def get_code_blocks():
 @app.post("/save-code-block/")
 async def save_code_block(block_data: dict):
     try:
+        if 'id' not in block_data:
+            block_data['id'] = str(uuid.uuid4())
+
         block = CodeBlock(**block_data)
         
         blocks = []
@@ -342,7 +345,13 @@ async def save_code_block(block_data: dict):
                 blocks = json.load(f)
         
         existing_index = next((i for i, b in enumerate(blocks) if b['id'] == block.id), -1)
-        
+        existing_ids = {b['id'] for b in blocks}
+        if block.id in existing_ids:
+            return JSONResponse(
+                status_code=400,
+                content={"message": "Block with this ID already exists"}
+            )
+
         if existing_index != -1:
             blocks[existing_index] = block.dict()
         else:
@@ -382,7 +391,6 @@ async def validation_exception_handler(request, exc):
         status_code=400,
         content={"message": f"Validation error: {str(exc)}"}
     )
-
 
 @app.get("/get-code-block/{block_id}")
 async def get_code_block(block_id: str):

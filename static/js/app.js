@@ -92,7 +92,7 @@ function initTree() {
             },
             'themes': {
                 'icons': false,
-                'dots': true, // Включаем точки для иерархии
+                'dots': true,
                 'stripes': false
             }
         },
@@ -108,7 +108,7 @@ function initTree() {
             'is_target': function(node) {
                 return node.type === 'folder';
             },
-            'copy': false // Запрещаем копирование
+            'copy': false
         },
         'contextmenu': {
             'items': generateContextMenu
@@ -504,8 +504,9 @@ async function deleteCodeBlock(id) {
 }
 
 function showAddCodeBlockModal() {
+    editingBlockId = null;
     document.getElementById('codeBlockTitle').value = '';
-    
+
     if (editor && editorInitialized) {
         editor.setValue('');
         editor.layout();

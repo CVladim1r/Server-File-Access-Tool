@@ -330,7 +330,6 @@ body {
     display: inline-block !important;
 }
 
-/* Убираем стандартное поведение браузера */
 #fileTree * {
     user-select: none;
     -webkit-user-drag: none;
