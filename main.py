@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
+from fastapi.encoders import jsonable_encoder
 
 from werkzeug.utils import secure_filename
 from urllib.parse import unquote
@@ -160,6 +161,149 @@ async def get_content(path: str = ""):
             status_code=500,
             content={"message": f"Error getting content: {str(e)}"}
         )
+
+# @app.post("/save-text/")
+# async def save_text(
+#     text: str = Form(...),
+#     path: str = Form(...)
+# ):
+#     def secure_path(path: str) -> str:
+#         path = path.strip('/')
+#         parts = path.split('/') if path else []
+#         secured_parts = [secure_filename(part) for part in parts]
+#         return '/'.join(secured_parts)
+
+#     try:
+#         if '..' in path or path.startswith('/'):
+#             raise HTTPException(status_code=400, detail="Invalid path format")
+        
+#         secured_path = secure_path(path)
+#         full_path = Path(UPLOAD_DIR) / secured_path
+        
+#         full_path.parent.mkdir(parents=True, exist_ok=True)
+#         with open(full_path, "w", encoding="utf-8") as f:
+#             f.write(text)
+        
+#         preview_path = await generate_preview(str(full_path), full_path.name)
+        
+#         return {
+#             "status": "success",
+#             "path": str(full_path.relative_to(UPLOAD_DIR)),
+#             "preview": f"/preview/{secured_path}" if preview_path else None
+#         }
+        
+#     except HTTPException as he:
+#         raise
+#     except Exception as e:
+#         return JSONResponse(
+#             status_code=500,
+#             content={"message": f"Error saving text: {str(e)}"}
+#         )
+
+
+
+
+@app.post("/st/")
+async def save_text(
+    text: str = Form(...),
+    filename: str = Form(...),
+    path: str = Form("") 
+):
+    def secure_path(target_path: str) -> Path:
+        target_path = target_path.strip('/')
+        parts = [secure_filename(p) for p in target_path.split('/')] if target_path else []
+        return Path(*parts)
+    
+    try:
+        safe_path = secure_path(path)
+        full_dir = Path(UPLOAD_DIR) / safe_path
+        full_dir.mkdir(parents=True, exist_ok=True)
+        safe_filename = secure_filename(filename) + ".txt"
+        full_path = full_dir / safe_filename
+        full_path.write_text(text, encoding="utf-8")
+        preview_path = await generate_preview(str(full_path), safe_filename)
+        
+        return {
+            "status": "success",
+            "path": str(full_path.relative_to(UPLOAD_DIR)),
+            "preview": f"/preview/{full_path.relative_to(UPLOAD_DIR)}" if preview_path else None
+        }
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"message": f"Error: {str(e)}"}
+        )
+
+
+
+
+@app.get("/tfs/", response_class=JSONResponse)
+async def get_text_files():
+    try:
+        files = []
+        allowed_ext = {'.txt', '.py', '.cpp'}
+        
+        for file_path in Path(UPLOAD_DIR).rglob('*.*'):
+            if file_path.suffix.lower() in allowed_ext:
+                relative_path = file_path.relative_to(UPLOAD_DIR)
+                files.append({
+                    "path": str(relative_path),
+                    "name": file_path.name,
+                    "type": file_path.suffix[1:]
+                })
+        
+        return JSONResponse(content=jsonable_encoder(sorted(files, key=lambda x: x['path'])))
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"message": f"Error: {str(e)}"}
+        )
+
+
+
+
+@app.get("/gtf/{path:path}", response_class=JSONResponse)
+async def get_text_file_content(path: str):
+    try:
+        file_path = Path(UPLOAD_DIR) / path
+        allowed_ext = {'.txt', '.py', '.cpp'}
+        
+        if not file_path.exists():
+            return Response(
+                content="File not found",
+                status_code=404,
+                media_type="text/plain"
+            )
+            
+        if file_path.suffix.lower() not in allowed_ext:
+            return Response(
+                content="Invalid file type",
+                status_code=400,
+                media_type="text/plain"
+            )
+            
+        content = file_path.read_text(encoding="utf-8", errors="replace")
+        
+        return Response(
+            content=content,
+            media_type="text/plain; charset=utf-8"
+        )
+        
+    except Exception as e:
+        return Response(
+            content=f"Error: {str(e)}",
+            status_code=500,
+            media_type="text/plain"
+        )
+
+
+
+
+
+
+
 
 @app.get("/get-file/{path:path}")
 async def get_file(path: str):
