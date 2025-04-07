@@ -1,6 +1,6 @@
+let editor;
 let currentPath = '';
 let selectedNode = null;
-let editor;
 let editorInitialized = false;
 let editingBlockId = null;
 
@@ -127,7 +127,6 @@ async function loadTreeData(node, cb) {
         const path = node.id === '#' ? '' : node.id;
         const response = await fetch(`/get-content/${encodeURIComponent(path)}`);
         const data = await response.json();
-        
         const items = data.content.map(item => ({
             id: item.path,
             text: `
@@ -208,6 +207,7 @@ async function createFolder() {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `path=${encodeURIComponent(newPath)}`
     });
+
     if (!response.ok) {
         const error = await response.json();
         showAlert(`Error: ${error.message}`, 'danger');
@@ -216,6 +216,7 @@ async function createFolder() {
     $('#fileTree').jstree(true).refresh_node(selectedNode || '#');
     showAlert('Folder created successfully!', 'success');
 }
+
 async function renameItem() {
     if (!selectedNode) return alert('Please select an item first');
     await renameItemPrompt(selectedNode);
@@ -230,6 +231,7 @@ async function moveItem() {
     if (!selectedNode) return alert('Please select an item first');
     await moveItemPrompt(selectedNode);
 }
+
 async function createFolderPrompt(node) {
     const name = prompt("Enter folder name");
     if (name) {
@@ -260,6 +262,7 @@ async function createFolderPrompt(node) {
         }
     }
 }
+
 async function renameItemPrompt(node) {
     const newName = prompt("Enter new name", node.text);
     if (newName) {
@@ -295,7 +298,6 @@ async function moveItemPrompt(node) {
     ));
     
     new bootstrap.Modal('#moveModal').show();
-    
     window.confirmMove = async () => {
         const newPath = select.val();
         await fetch('/move-item/', {
@@ -369,7 +371,6 @@ function handleMoveNode(e, data) {
         showAlert(`Error: ${error.message}`, 'danger', 3000);
     });
 }
-
 
 async function uploadFile() {
     const input = document.getElementById('fileInput');
@@ -483,7 +484,6 @@ async function saveCodeBlock() {
         if (!response.ok) throw new Error('Save failed');
         
         editingBlockId = null;
-        // new bootstrap.Modal(document.getElementById('codeBlockModal')).hide();
         showAlert('Block saved successfully!', 'success');
         const modal = bootstrap.Modal.getInstance(document.getElementById('codeBlockModal'));
         if (modal) {

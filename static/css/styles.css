@@ -246,7 +246,6 @@ body {
 }
 
 .download-btn {
-    /* margin-left: auto !important; */
     order: 3;
     background-color: #fff;
     color: black !important;
@@ -336,7 +335,6 @@ body {
     drag-handle: none;
 }
 
-/* Фикс для превью при перетаскивании */
 .jstree-dnd-helper {
     opacity: 0.8 !important;
     background: #fff !important;

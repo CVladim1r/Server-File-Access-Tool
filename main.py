@@ -17,23 +17,17 @@ from fastapi.encoders import jsonable_encoder
 from werkzeug.utils import secure_filename
 from urllib.parse import unquote
 from pathlib import Path
-from PIL import Image
-from pydantic import BaseModel, Field
 from typing import List
+from PIL import Image
+
+from views import CodeBlock
 
 
 UPLOAD_DIR = "uploads"
 PREVIEW_DIR = "previews"
 
-class CodeBlock(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    title: str
-    content: str
-    collapsed: bool = False 
-
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(PREVIEW_DIR, exist_ok=True)
-
 
 app = FastAPI(
     debug = False,
@@ -52,13 +46,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 async def generate_preview(file_path: str, filename: str):
     relative_path = os.path.relpath(file_path, UPLOAD_DIR)
     preview_path = os.path.join(PREVIEW_DIR, relative_path)
     preview_dir = os.path.dirname(preview_path)
     os.makedirs(preview_dir, exist_ok=True)
-
     mime_type, _ = mimetypes.guess_type(filename)
     
     try:
@@ -75,12 +67,9 @@ async def generate_preview(file_path: str, filename: str):
             with open(preview_path, 'w') as f:
                 f.write(wrapped)
             return preview_path
-            
     except Exception as e:
         print(f"Preview generation error: {str(e)}")
-    
     return None
-
 
 @app.get("/", response_class=HTMLResponse)
 async def main_page(request: Request):
@@ -93,7 +82,6 @@ async def create_folder(path: str = Form(...)):
             raise HTTPException(status_code=400, detail="Invalid path format")
             
         full_path = Path(UPLOAD_DIR) / path
-        
         if full_path.exists() and full_path.is_file():
             raise HTTPException(status_code=400, detail="Can't create folder with existing file name")
         
@@ -144,7 +132,6 @@ async def get_content(path: str = ""):
         for item in target_path.iterdir():
             item_path = str(Path(path) / item.name) if path else item.name
             preview_path = Path(PREVIEW_DIR) / item_path
-            
             content.append({
                 "name": item.name,
                 "type": "folder" if item.is_dir() else "file",
@@ -156,52 +143,11 @@ async def get_content(path: str = ""):
     except HTTPException as he:
         raise
     except Exception as e:
-        print(f"Error getting content: {str(e)}")  # Логирование
+        print(f"Error getting content: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={"message": f"Error getting content: {str(e)}"}
         )
-
-# @app.post("/save-text/")
-# async def save_text(
-#     text: str = Form(...),
-#     path: str = Form(...)
-# ):
-#     def secure_path(path: str) -> str:
-#         path = path.strip('/')
-#         parts = path.split('/') if path else []
-#         secured_parts = [secure_filename(part) for part in parts]
-#         return '/'.join(secured_parts)
-
-#     try:
-#         if '..' in path or path.startswith('/'):
-#             raise HTTPException(status_code=400, detail="Invalid path format")
-        
-#         secured_path = secure_path(path)
-#         full_path = Path(UPLOAD_DIR) / secured_path
-        
-#         full_path.parent.mkdir(parents=True, exist_ok=True)
-#         with open(full_path, "w", encoding="utf-8") as f:
-#             f.write(text)
-        
-#         preview_path = await generate_preview(str(full_path), full_path.name)
-        
-#         return {
-#             "status": "success",
-#             "path": str(full_path.relative_to(UPLOAD_DIR)),
-#             "preview": f"/preview/{secured_path}" if preview_path else None
-#         }
-        
-#     except HTTPException as he:
-#         raise
-#     except Exception as e:
-#         return JSONResponse(
-#             status_code=500,
-#             content={"message": f"Error saving text: {str(e)}"}
-#         )
-
-
-
 
 @app.post("/st/")
 async def save_text(
@@ -235,9 +181,6 @@ async def save_text(
             content={"message": f"Error: {str(e)}"}
         )
 
-
-
-
 @app.get("/tfs/", response_class=JSONResponse)
 async def get_text_files():
     try:
@@ -260,9 +203,6 @@ async def get_text_files():
             status_code=500,
             content={"message": f"Error: {str(e)}"}
         )
-
-
-
 
 @app.get("/gtf/{path:path}", response_class=JSONResponse)
 async def get_text_file_content(path: str):
@@ -298,13 +238,6 @@ async def get_text_file_content(path: str):
             media_type="text/plain"
         )
 
-
-
-
-
-
-
-
 @app.get("/get-file/{path:path}")
 async def get_file(path: str):
     file_path = Path(UPLOAD_DIR) / path
@@ -335,7 +268,6 @@ async def rename_item(old_path: str = Form(...), new_name: str = Form(...)):
             raise HTTPException(status_code=400, detail="Item already exists")
         
         old_full.rename(new_full)
-        
         old_preview = Path(PREVIEW_DIR) / old_path
         if old_preview.exists():
             new_preview = old_preview.parent / new_name
@@ -361,12 +293,10 @@ async def move_item(old_path: str = Form(...), new_path: str = Form(...)):
             new_full.parent.mkdir(parents=True, exist_ok=True)
 
         shutil.move(str(old_full), str(new_full))
-
         old_preview = Path(PREVIEW_DIR) / unquote(old_path)
         if old_preview.exists():
             new_preview = Path(PREVIEW_DIR) / unquote(new_path)
             shutil.move(str(old_preview), str(new_preview))
-
         return {"status": "success"}
 
     except Exception as e:
@@ -390,7 +320,6 @@ async def upload_file(file: UploadFile = File(...), path: str = Form("")):
 
         safe_path = Path(UPLOAD_DIR) / target_dir
         safe_path.mkdir(parents=True, exist_ok=True)
-
         original_filename = secure_filename(file.filename)
         file_name = f"{original_filename}"
         file_path = safe_path / file_name
@@ -404,7 +333,6 @@ async def upload_file(file: UploadFile = File(...), path: str = Form("")):
         except Exception as preview_error:
             print(f"Preview error: {preview_error}")
             preview_path = None
-        
         return {
             "filename": str(file_path.relative_to(UPLOAD_DIR)),
             "preview": f"/preview/{file_path.relative_to(UPLOAD_DIR)}" if preview_path else None,
@@ -482,7 +410,6 @@ async def save_code_block(block_data: dict):
             block_data['id'] = str(uuid.uuid4())
 
         block = CodeBlock(**block_data)
-        
         blocks = []
         if Path("code_blocks.json").exists():
             with open("code_blocks.json", "r") as f:
@@ -500,7 +427,7 @@ async def save_code_block(block_data: dict):
             blocks[existing_index] = block.dict()
         else:
             blocks.append(block.dict())
-        
+
         with open("code_blocks.json", "w") as f:
             json.dump(blocks, f, indent=2)
             
@@ -563,10 +490,7 @@ async def update_code_block(block_id: str, block_data: dict):
         return JSONResponse(status_code=404, content={"message": "Block not found"})
 
 @app.patch("/update-block/{block_id}/")
-async def update_block_state(
-    block_id: str, 
-    payload: dict = Body(...)
-):
+async def update_block_state(block_id: str, payload: dict = Body(...)):
     try:
         with open("code_blocks.json", "r") as f:
             blocks = json.load(f)
